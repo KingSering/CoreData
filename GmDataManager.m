@@ -50,9 +50,20 @@
     // 创建持久化存储调度器
     NSError *error = nil;
     _persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:[self managedObjectModel]];
+    
+    /**
+     这里说一下新增加的2个参数的意义： NSMigratePersistentStoresAutomaticallyOption = YES，那么Core Data会试着把之前低版本的出现不兼容的持久化存储区迁移到新的模型中，这里的例子里，Core Data就能识别出是新表，就会新建出新表的存储区来，上面就不会报上面的error了。
+     NSInferMappingModelAutomaticallyOption = YES,这个参数的意义是Core Data会根据自己认为最合理的方式去尝试MappingModel，从源模型实体的某个属性，映射到目标模型实体的某个属性。
+     */
+    NSDictionary *options =
+        @{
+          NSSQLitePragmasOption: @{@"journal_mode": @"DELETE"},
+          NSMigratePersistentStoresAutomaticallyOption :@YES,
+          NSInferMappingModelAutomaticallyOption:@YES
+        };
     // 创建并关联SQLite数据库文件，如果已经存在则不会重复创建
     NSURL *storeURL = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"Gm001Model.sqlite"];
-    if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:nil error:&error]) {
+    if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:options error:&error]) {
         NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
         abort();
     }
