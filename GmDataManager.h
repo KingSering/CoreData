@@ -14,6 +14,9 @@
 #import "GmHeartRate+CoreDataClass.h"
 #import "GmHeartRate+CoreDataProperties.h"
 
+#import "GmBloodOxygen+CoreDataClass.h"
+#import "GmBloodOxygen+CoreDataProperties.h"
+
 
 
 

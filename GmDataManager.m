@@ -59,13 +59,21 @@
         @{
           NSSQLitePragmasOption: @{@"journal_mode": @"DELETE"},
           NSMigratePersistentStoresAutomaticallyOption :@YES,
-          NSInferMappingModelAutomaticallyOption:@YES
+          NSInferMappingModelAutomaticallyOption:@NO// YES 自动迁移 NO 手动迁移
         };
+ 
     // 创建并关联SQLite数据库文件，如果已经存在则不会重复创建
     NSURL *storeURL = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"Gm001Model.sqlite"];
     if (![_persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:storeURL options:options error:&error]) {
-        NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
-        abort();
+        
+        // 数据迁移失败，尝试手动迁移 NSInferMappingModelAutomaticallyOption @NO
+                [self manualMigrationWithOptions:options storeURL:storeURL error:&error];
+                
+                if (error) {
+                    NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
+                    abort();
+                }
+        
     }
     return _persistentStoreCoordinator;
 }
@@ -81,5 +89,29 @@
     }
 }
 
+- (void)manualMigrationWithOptions:(NSDictionary *)options storeURL:(NSURL *)storeURL error:(NSError **)error {
+    // 创建托管对象模型
+    NSManagedObjectModel *sourceModel = [NSManagedObjectModel mergedModelFromBundles:nil forStoreMetadata:nil];
+    
+    // 创建源和目标数据库并进行迁移
+    NSMappingModel *mappingModel = [NSMappingModel mappingModelFromBundles:nil forSourceModel:sourceModel destinationModel:self.managedObjectModel];
+    
+    if (mappingModel != nil && sourceModel != nil) {
+        NSMigrationManager *migrationManager = [[NSMigrationManager alloc] initWithSourceModel:sourceModel destinationModel:self.managedObjectModel];
+        
+        // 创建目标数据库文件
+        NSURL *destStoreURL = [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"Gm001Model1.sqlite"];
+        if ([migrationManager migrateStoreFromURL:storeURL type:NSSQLiteStoreType options:options withMappingModel:mappingModel toDestinationURL:destStoreURL destinationType:NSSQLiteStoreType destinationOptions:options error:error]) {
+            // 迁移成功，删除旧的数据库文件，将新数据库文件重命名为原文件名
+            [[NSFileManager defaultManager] removeItemAtURL:storeURL error:nil];
+            [[NSFileManager defaultManager] moveItemAtURL:destStoreURL toURL:storeURL error:nil];
+        } else {
+            // 迁移失败，删除新数据库文件
+            [[NSFileManager defaultManager] removeItemAtURL:destStoreURL error:nil];
+        }
+    } else {
+        NSLog(@"Cannot create an NSMigrationManager with a nil source model");
+    }
+}
 
 @end
